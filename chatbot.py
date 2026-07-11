@@ -259,7 +259,7 @@ one per line as ref|title|start|end :
 Rules:
 - Return only a valid JSON object with exactly two keys: reply and operations.
 - operations is an array; each item has action (create, update, delete, create_recurring_commitment, create_activity, or none) plus applicable fields.
-- Dates and times must be complete ISO 8601 strings with timezone offsets when a time is known.
+- Dates and times must be complete local ISO 8601 datetimes in the form YYYY-MM-DDTHH:MM. Do not include a timezone offset or Z suffix.
 - For a new event, use action=create and leave ref blank.
 - To add a weekly fixed commitment, use action=create_recurring_commitment with title, day (MON through SUN), start (HH:MM), and end (HH:MM). Ask a follow-up question if its weekday or times are missing.
 - To add a prioritised study activity, use action=create_activity with title, hours (weekly study hours), and priority (1 = highest, 5 = lowest). Ask a follow-up question if hours or priority are missing.

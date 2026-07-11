@@ -81,6 +81,16 @@ def _valid_event_datetime(value: object) -> bool:
         return False
 
 
+def calendar_datetime(value: str) -> str:
+    """Store calendar datetimes as local wall-clock values, without an offset.
+
+    FullCalendar converts ISO values with an offset into the browser timezone.
+    The timetable plan deliberately uses local, offset-free values, so chat
+    operations must follow the same convention to avoid a shifted event.
+    """
+    return datetime.fromisoformat(value).replace(tzinfo=None).isoformat(timespec="minutes")
+
+
 def apply_operations(operations: list[dict]) -> int:
     changes = 0
     planner_changed = False
@@ -111,6 +121,8 @@ def apply_operations(operations: list[dict]) -> int:
             if not (_valid_event_datetime(operation.get("start")) and _valid_event_datetime(operation.get("end"))):
                 continue
             event = {key: value for key, value in operation.items() if value not in (None, "")}
+            event["start"] = calendar_datetime(operation["start"])
+            event["end"] = calendar_datetime(operation["end"])
             event.update({"id": str(uuid4()), "color": ACTIVITY_COLOR, "kind": "commitment"})
             st.session_state.events.append(event)
             changes += 1
@@ -118,6 +130,8 @@ def apply_operations(operations: list[dict]) -> int:
             for key in ("start", "end"):
                 if key in operation and not _valid_event_datetime(operation[key]):
                     operation.pop(key)
+                elif key in operation:
+                    operation[key] = calendar_datetime(operation[key])
             event.update({key: value for key, value in operation.items() if key not in {"action", "event_id"} and value not in (None, "")})
             changes += 1
         elif action == "delete" and event_id:
