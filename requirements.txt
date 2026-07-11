@@ -1,0 +1,4 @@
+streamlit>=1.37,<2
+streamlit-calendar==1.4.0
+groq>=0.30
+pypdf>=5
