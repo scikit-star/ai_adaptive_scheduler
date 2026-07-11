@@ -405,8 +405,6 @@ if page == "Schedule":
             renderable_events.sort(key=lambda event: event["start"])
         if len(renderable_events) != len(valid_events):
             st.caption(f"Showing {len(renderable_events)} of {len(valid_events)} events near this date range. Use prev/next to browse further out.")
-        with st.expander("🔧 Debug: raw events sent to calendar (temporary)"):
-            st.json(renderable_events)
         result = calendar(
             events=renderable_events,
             options={"initialView": "timeGridWeek", "initialDate": initial_date, "headerToolbar": {"left": "prev,next today", "center": "title", "right": "dayGridMonth,timeGridWeek,timeGridDay"}, "editable": True, "eventDurationEditable": True, "height": 700},
@@ -426,35 +424,47 @@ if page == "Schedule":
                 st.write(f"**Type:** {selected_event.get('kind', 'event').replace('_', ' ').title()}")
                 if description := selected_event.get("description"):
                     st.write(f"**Notes:** {description}")
+                st.divider()
+                st.caption("Update or delete this event")
+                with st.form(f"event-details-{selected_event['id']}"):
+                    title = st.text_input("Title", value=selected_event["title"])
+                    event_date = st.date_input("Date", value=start.date())
+                    start_time = st.time_input("Starts", value=start.time())
+                    end_time = st.time_input("Ends", value=end.time())
+                    description = st.text_area("Notes", value=selected_event.get("description", ""))
+                    save, delete = st.columns(2)
+                    save_clicked = save.form_submit_button("Update event", type="primary")
+                    delete_clicked = delete.form_submit_button("Delete event")
+                if save_clicked:
+                    updated_start = datetime.combine(event_date, start_time).isoformat(timespec="minutes")
+                    updated_end = datetime.combine(event_date, end_time).isoformat(timespec="minutes")
+                    if not title.strip() or updated_end <= updated_start:
+                        st.error("Provide a title and an end time after the start time.")
+                    else:
+                        selected_event.update({"title": title.strip(), "start": updated_start, "end": updated_end, "description": description})
+                        st.rerun()
+                if delete_clicked:
+                    st.session_state.events = [event for event in st.session_state.events if event["id"] != selected_event["id"]]
+                    st.session_state.selected_event_id = None
+                    st.rerun()
     with right:
-        st.subheader("Manual event editor")
-        choices = {f"{event['title']} ({event['start'][:10]})": event["id"] for event in st.session_state.events}
-        selected_label = st.selectbox("Event to edit", ["New event", *choices])
-        selected = event_by_id(choices[selected_label]) if selected_label != "New event" else None
-        default_start = datetime.fromisoformat(selected["start"]) if selected else datetime.now().replace(minute=0, second=0, microsecond=0)
-        default_end = datetime.fromisoformat(selected["end"]) if selected else default_start + timedelta(hours=1)
-        with st.form("manual-crud", clear_on_submit=not selected):
-            title = st.text_input("Title", value=selected["title"] if selected else "")
+        st.subheader("Create an event")
+        default_start = datetime.now().replace(minute=0, second=0, microsecond=0)
+        default_end = default_start + timedelta(hours=1)
+        with st.form("manual-create", clear_on_submit=True):
+            title = st.text_input("Title")
             event_date = st.date_input("Date", value=default_start.date())
             start_time = st.time_input("Starts", value=default_start.time())
             end_time = st.time_input("Ends", value=default_end.time())
-            description = st.text_area("Notes", value=selected.get("description", "") if selected else "")
-            save, delete = st.columns(2)
-            save_clicked = save.form_submit_button("Save event", type="primary")
-            delete_clicked = delete.form_submit_button("Delete", disabled=selected is None)
+            description = st.text_area("Notes")
+            save_clicked = st.form_submit_button("Create event", type="primary")
         if save_clicked:
             start, end = datetime.combine(event_date, start_time).isoformat(timespec="minutes"), datetime.combine(event_date, end_time).isoformat(timespec="minutes")
             if not title.strip() or end <= start:
                 st.error("Provide a title and an end time after the start time.")
-            elif selected:
-                selected.update({"title": title.strip(), "start": start, "end": end, "description": description})
-                st.rerun()
             else:
                 st.session_state.events.append({"id": str(uuid4()), "title": title.strip(), "start": start, "end": end, "description": description, "color": ACTIVITY_COLOR, "kind": "commitment"})
                 st.rerun()
-        if delete_clicked and selected:
-            st.session_state.events = [event for event in st.session_state.events if event["id"] != selected["id"]]
-            st.rerun()
 
     st.divider()
     st.subheader("Chat with your calendar")
