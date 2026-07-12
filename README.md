@@ -240,6 +240,6 @@ Start the application:
 streamlit run index.py
 ```
 
-Use a text-based timetable PDF. Scanned image-only PDFs currently require OCR before upload.
+Use a text-based timetable PDF (an anonymized test timetable has been provided in the google drive). Scanned image-only PDFs currently require OCR before upload.
 
 
