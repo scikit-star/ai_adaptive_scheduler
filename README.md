@@ -50,8 +50,8 @@ Classes, commitments, and study sessions are colour-coded so the generated plan 
 - Streamlit
 - `streamlit-calendar` / FullCalendar
 - Groq API
-- Llama 4 Scout for timetable transcription
-- GPT-OSS models for fallback transcription and calendar commands
+- GPT-OSS for timetable transcription and calendar commands
+- Llama 3.3 70B as timetable-transcription fallback
 - `pypdf` for extracting text from PDF documents
 
 ## AI tools and coding agents used
@@ -119,8 +119,7 @@ This experience demonstrated that AI output still requires validation, bounded c
 - Priority based study scheduling
 - Natural language calendar CRUD
 - Manual event CRUD
-- Dragging and resizing calendar events
-- Study-session deferral when the student is unavailable
+- Study-session deferral when the student is tired/unavailable
 - Week-wide study redistribution
 - Timetable model fallback
 - Imported-class review before relying on the generated schedule
@@ -136,6 +135,7 @@ This experience demonstrated that AI output still requires validation, bounded c
 - Planner data conflicting with Streamlit widget session-state keys
 - Study rescheduling accidentally affecting fixed classes or commitments
 - Invalid commitment, activity, and time-range input
+- meta-llama/llama-4-scout-17b-16e-instruct became unaccessible a week after deployment of the site, replaced with openai/gpt-oss-120b
 
 ## Technical choices
 
@@ -234,6 +234,12 @@ Alternatively, add it to `.streamlit/secrets.toml`:
 GROQ_API_KEY = "your-api-key"
 ```
 
+The default timetable model is `openai/gpt-oss-120b`, with
+`llama-3.3-70b-versatile` as its fallback. The importer limits model output to
+1,500 tokens so it stays within Groq's common 8,000 TPM starter limit. You can
+override either model or the output limit with `TIMETABLE_MODEL`,
+`TIMETABLE_FALLBACK_MODEL`, and `TIMETABLE_MAX_COMPLETION_TOKENS`.
+
 Start the application:
 
 ```bash
@@ -241,5 +247,4 @@ streamlit run index.py
 ```
 
 Use a text-based timetable PDF (an anonymized test timetable has been provided in the google drive). Scanned image-only PDFs currently require OCR before upload.
-
 

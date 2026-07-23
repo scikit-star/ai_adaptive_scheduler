@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import re
 from typing import Any
@@ -12,6 +13,11 @@ from pypdf import PdfReader
 
 
 EXCLUDED_LABELS = {"BREAK", "LUNCH", "MORNING ASSEMBLY", "ASSEMBLY"}
+# A school timetable normally needs only a few hundred output tokens. Keeping this
+# comfortably below Groq's common 8K TPM starter limit also leaves room for the
+# extracted PDF text in the same request.
+DEFAULT_MAX_COMPLETION_TOKENS = 1_500
+logger = logging.getLogger(__name__)
 LINE_PATTERN = re.compile(
     r"^\s*(ODD|EVEN)\s*\|\s*(MON|TUE|WED|THU|FRI)\s*\|\s*"
     r"(\d{1,2}:\d{2})\s*\|\s*(\d{1,2}:\d{2})\s*\|\s*(.+?)\s*$",
@@ -69,10 +75,10 @@ TIMETABLE:
 def _request_transcript(client: Groq, prompt: str) -> str:
     """Use ordinary text completion, with a second model as an automatic fallback."""
     models = [
-        os.getenv("TIMETABLE_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct"),
-        os.getenv("TIMETABLE_FALLBACK_MODEL", "openai/gpt-oss-120b"),
+        os.getenv("TIMETABLE_MODEL", "openai/gpt-oss-120b"),
+        os.getenv("TIMETABLE_FALLBACK_MODEL", "llama-3.3-70b-versatile"),
     ]
-    last_error: Exception | None = None
+    failures: list[str] = []
     for model in dict.fromkeys(models):
         try:
             response = client.chat.completions.create(
@@ -82,17 +88,25 @@ def _request_transcript(client: Groq, prompt: str) -> str:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0,
-                max_completion_tokens=8000,
+                max_completion_tokens=int(
+                    os.getenv("TIMETABLE_MAX_COMPLETION_TOKENS", DEFAULT_MAX_COMPLETION_TOKENS)
+                ),
             )
             content = response.choices[0].message.content or ""
             if _parse_transcript(content):
                 return content
+            failures.append(f"{model}: response contained no valid lesson lines")
         except Exception as error:
-            last_error = error
+            # Preserve the useful Groq status/message in the server logs without
+            # ever logging the API key or the uploaded timetable contents.
+            logger.warning("Timetable transcription failed for %s: %s", model, error)
+            failures.append(f"{model}: {type(error).__name__}: {error}")
+
+    detail = "; ".join(failures) or "No model response was received."
     raise ValueError(
-        "Groq could not transcribe the timetable in the requested format. "
-        "Check your Groq model access and try again."
-    ) from last_error
+        "Groq could not transcribe the timetable. "
+        f"Details: {detail}"
+    )
 
 
 def _parse_transcript(transcript: str) -> list[dict[str, Any]]:
